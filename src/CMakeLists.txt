@@ -10,6 +10,6 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_executable(laser laser.cpp)
 
-llvm_map_components_to_libnames(LLVM_LIBS core native)
+llvm_map_components_to_libnames(LLVM_LIBS core ipo native)
 
 target_link_libraries(laser ${LLVM_LIBS})

@@ -1,10 +1,17 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
+
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
 
 #include <memory>
 
@@ -14,6 +21,14 @@ main(int argc, char** argv)
   llvm::LLVMContext llvm_context;
   llvm::IRBuilder<> ir_builder(llvm_context);
   auto the_module = std::make_unique<llvm::Module>("top", llvm_context);
+  auto the_pm = std::make_unique<llvm::legacy::PassManager>();
+
+  the_pm->add(llvm::createAlwaysInlinerLegacyPass());
+  the_pm->add(llvm::createFunctionInliningPass());
+  the_pm->add(llvm::createInstructionCombiningPass());
+  the_pm->add(llvm::createReassociatePass());
+  the_pm->add(llvm::createGVNPass());
+  the_pm->add(llvm::createCFGSimplificationPass());
 
   // == puts ==
 
@@ -44,6 +59,8 @@ main(int argc, char** argv)
   ir_builder.CreateCall(puts_function, hello_world_str);
   ir_builder.CreateRetVoid();             // ret void
 
+  llvm::verifyFunction(*hello_function);
+
   // == main ==
 
   // function type of main: () -> i32
@@ -62,11 +79,12 @@ main(int argc, char** argv)
                                             main_function);
   ir_builder.SetInsertPoint(main_body);
   ir_builder.CreateCall(hello_function); // call hello
-  auto result = ir_builder.getInt32(42);
+  auto result = ir_builder.CreateAdd(ir_builder.getInt32(11), ir_builder.getInt32(31));
   ir_builder.CreateRet(result);          // ret i32 42
 
   llvm::verifyFunction(*main_function);
 
+  the_pm->run(*the_module);
   the_module->print(llvm::errs(), nullptr);
 
   return 0;
